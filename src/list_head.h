@@ -22,14 +22,13 @@ extern "C" {
  */
 #ifndef container_of
 #define container_of(ptr, type, member) ({ \
-			const typeof(((type *)0)->member) * __mptr = (ptr); \
-			(type *)((char *)__mptr - offsetof(type, member)); })
+		const typeof(((type *)0)->member) * __mptr = (ptr); \
+		(type *)((char *)__mptr - offsetof(type, member)); })
 #endif
 
-typedef struct list_head
-{
+typedef struct list_head {
 	struct list_head* prev, *next;
-}list_head_t;
+} list_head_t;
 
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
 
@@ -45,7 +44,7 @@ static inline void list_init(list_head_t* head)
 
 static inline int list_empty(list_head_t* head)
 {
-	return (head->next==head);
+	return (head->next == head);
 }
 
 static inline void __list_add(list_head_t *item, list_head_t *prev, list_head_t *next)
@@ -58,17 +57,17 @@ static inline void __list_add(list_head_t *item, list_head_t *prev, list_head_t 
 
 static inline void list_add_head(list_head_t* item, list_head_t* head)
 {
-    __list_add(item, head, head->next);
+	__list_add(item, head, head->next);
 }
 
 static inline void list_add_tail(list_head_t* item, list_head_t* head)
 {
-    __list_add(item, head->prev, head);
+	__list_add(item, head->prev, head);
 }
 
 static inline void list_del(list_head_t* item)
 {
-    item->prev->next = item->next;
+	item->prev->next = item->next;
 	item->next->prev = item->prev;
 	item->next = item;
 	item->prev = item;
@@ -100,7 +99,7 @@ static inline int list_count(list_head_t* head)
  * @head:	the head for your list.
  */
 #define list_for_each(pos, head) \
-		for (pos = (head)->next; list_prefetch(pos->next), pos != (head); pos = pos->next)
+	for (pos = (head)->next; list_prefetch(pos->next), pos != (head); pos = pos->next)
 
 /**
  * list_for_each_safe - iterate over a list safe against removal of list entry
@@ -109,7 +108,7 @@ static inline int list_count(list_head_t* head)
  * @head:	the head for your list.
  */
 #define list_for_each_safe(pos, n, head) \
-		for (pos = (head)->next, n = pos->next; pos != (head); pos = n, n = pos->next)
+	for (pos = (head)->next, n = pos->next; pos != (head); pos = n, n = pos->next)
 
 /**
  * list_for_each_prev - iterate over a list backwards
@@ -117,7 +116,7 @@ static inline int list_count(list_head_t* head)
  * @head:	the head for your list.
  */
 #define list_for_each_prev(pos, head) \
-		for (pos = (head)->prev; list_prefetch(pos->prev), pos != (head); pos = pos->prev)
+	for (pos = (head)->prev; list_prefetch(pos->prev), pos != (head); pos = pos->prev)
 
 /**
  * list_for_each_prev_safe - iterate over a list backwards safe against removal of list entry
@@ -126,8 +125,8 @@ static inline int list_count(list_head_t* head)
  * @head:	the head for your list.
  */
 #define list_for_each_prev_safe(pos, n, head) \
-		for (pos = (head)->prev, n = pos->prev; list_prefetch(pos->prev), pos != (head); \
-			pos = n, n = pos->prev)
+	for (pos = (head)->prev, n = pos->prev; list_prefetch(pos->prev), pos != (head); \
+		 pos = n, n = pos->prev)
 
 /**
  * list_entry - get the &struct for this entry
@@ -144,9 +143,9 @@ static inline int list_count(list_head_t* head)
  * @member:	the name of the list_struct within the struct.
  */
 #define list_for_each_entry(pos, head, member) \
-		for (pos = list_entry((head)->next, typeof(*pos), member);	\
-			list_prefetch(pos->member.next), &pos->member != (head); \
-			pos = list_entry(pos->member.next, typeof(*pos), member))
+	for (pos = list_entry((head)->next, typeof(*pos), member);	\
+		 list_prefetch(pos->member.next), &pos->member != (head); \
+		 pos = list_entry(pos->member.next, typeof(*pos), member))
 
 /**
  * list_for_each_entry_safe - iterate over list of given type safe against removal of list entry
@@ -156,10 +155,10 @@ static inline int list_count(list_head_t* head)
  * @member: the name of the struct list_head within the struct.
  */
 #define list_for_each_entry_safe(pos, n, head, member) \
-		for (pos = list_entry((head)->next, typeof(*pos), member),	\
-			n = list_entry(pos->member.next, typeof(*pos), member); \
-			&pos->member != (head);	 \
-			pos = n, n = list_entry(n->member.next, typeof(*n), member))
+	for (pos = list_entry((head)->next, typeof(*pos), member),	\
+		 n = list_entry(pos->member.next, typeof(*pos), member); \
+		 &pos->member != (head);	 \
+		 pos = n, n = list_entry(n->member.next, typeof(*n), member))
 
 /**
  * list_for_each_entry_reverse - iterate backwards over list of given type.
@@ -168,9 +167,9 @@ static inline int list_count(list_head_t* head)
  * @member:	the name of the list_struct within the struct.
  */
 #define list_for_each_entry_reverse(pos, head, member) \
-		for (pos = list_entry((head)->prev, typeof(*pos), member);	\
-			list_prefetch(pos->member.prev), &pos->member != (head); \
-			pos = list_entry(pos->member.prev, typeof(*pos), member))
+	for (pos = list_entry((head)->prev, typeof(*pos), member);	\
+		 list_prefetch(pos->member.prev), &pos->member != (head); \
+		 pos = list_entry(pos->member.prev, typeof(*pos), member))
 
 /**
  * list_for_each_entry_safe_reverse
@@ -183,10 +182,10 @@ static inline int list_count(list_head_t* head)
  * of list entry.
  */
 #define list_for_each_entry_safe_reverse(pos, n, head, member) \
-		for (pos = list_entry((head)->prev, typeof(*pos), member),	\
-			n = list_entry(pos->member.prev, typeof(*pos), member); \
-			&pos->member != (head); \
-			pos = n, n = list_entry(n->member.prev, typeof(*n), member))
+	for (pos = list_entry((head)->prev, typeof(*pos), member),	\
+		 n = list_entry(pos->member.prev, typeof(*pos), member); \
+		 &pos->member != (head); \
+		 pos = n, n = list_entry(n->member.prev, typeof(*n), member))
 
 /**
  * list_cmp_func - compare function prototype, comparing two nodes which has struct list_head embeded.
@@ -205,8 +204,8 @@ typedef int (*list_cmp_func)(list_head_t* item1, list_head_t* item2);
 static inline void list_insert(list_head_t* item, list_head_t* head, list_cmp_func func, int crease)
 {
 	list_head_t* pos;
-	for ( pos = head->next; pos != head; pos = pos->next ) {
-		if ( func(item, pos) * crease < 0 ) {
+	for (pos = head->next; pos != head; pos = pos->next) {
+		if (func(item, pos) * crease < 0) {
 			__list_add(item, pos->prev, pos);
 			return;
 		}
@@ -215,7 +214,7 @@ static inline void list_insert(list_head_t* item, list_head_t* head, list_cmp_fu
 }
 
 /**
- * list_insert_reverse: insert node by comparing from tail to head. 
+ * list_insert_reverse: insert node by comparing from tail to head.
  * @item:	the &struct list_head member of node to be insert.
  * @head:	the head for your list.
  * @crease:	increase list use 1, decrease lise use -1.
@@ -224,7 +223,7 @@ static inline void list_insert_reverse(list_head_t* item, list_head_t* head, lis
 {
 	list_head_t* pos;
 	for (pos = head->prev; pos != head; pos = pos->prev) {
-		if ( func(item, pos) * crease > 0) {
+		if (func(item, pos) * crease > 0) {
 			__list_add(item, pos, pos->next);
 			return;
 		}

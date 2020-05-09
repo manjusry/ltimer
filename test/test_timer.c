@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "timer.h"
+#include "ltimer.h"
 
 #define BUCKET_SIZE		3
 #define BUCKET_CPUID	3
@@ -18,7 +18,7 @@ int main()
 {
 	struct timespec tick = {0, 100};
 	TimerBucketID_t bktid = create_timer_bucket("testbucket", BUCKET_SIZE, BUCKET_CPUID, tick);
-	if ( -1 == bktid ) {
+	if (-1 == bktid) {
 		exit(EXIT_FAILURE);
 	}
 
@@ -34,15 +34,15 @@ int main()
 	struct timespec t4 = {4, 0};
 	TimerID_t timer_4 = add_timer(bktid, t4, print_timer_info, "Timer No.4 ", 1);
 
-	while(1) {
+	while (1) {
 		pause();
 	}
-	
+
 	del_timer(timer_1);
 	del_timer(timer_2);
 	del_timer(timer_3);
 	del_timer(timer_4);
 	destroy_timer_bucket(bktid);
-	
+
 	return 0;
 }

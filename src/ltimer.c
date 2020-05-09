@@ -18,29 +18,26 @@
 #include "list_head.h"
 #include "utils.h"
 
-#include "timer.h"
+#include "ltimer.h"
 
 #define MAX_EVENT_NUMBER	8
 
-enum
-{
+enum {
 	EN_TIMER_OPT_ADD,
 	EN_TIMER_OPT_DEL,
 	EN_TIMER_OPT_MOD,
 };
 
-typedef struct st_ltimer_opt
-{
+typedef struct st_ltimer_opt {
 	int					opt;		//refer to EN_TIMER_OPT_XXX.
 	int					pad;		//padding bytes.
 	TimerID_t			id;			//timer id.
 	struct timespec		period;		//period time.
 	time_out_proc		func;		//callback func when timeout.
 	void *				data;		//data for callback.
-}ltimer_opt_t;
+} ltimer_opt_t;
 
-typedef struct st_ltimer
-{
+typedef struct st_ltimer {
 	struct list_head	entry;		//list head entry.
 
 	void *				p_bkt;		//relate to timer bucket.
@@ -49,16 +46,15 @@ typedef struct st_ltimer
 	struct timespec		expire;		//expire time, use abs time.
 	time_out_proc		func;		//callback func when timeout.
 	void *				data;		//data for callback.
-	
+
 	int					type;		//cycle(1) or once(0) timer.
 	int					pad;		//padding bytes.
-}ltimer_t;
+} ltimer_t;
 
-typedef struct st_timer_bucket
-{
+typedef struct st_timer_bucket {
 	struct list_head	active_list;	//active timer list head entry.
 	struct list_head	recycle_list;	//dead timer list head entry.
-	
+
 	char*				mem_alloc_ptr;	//memory ptr for final release.
 	char*				cur_alloc_ptr;	//memory ptr for next allocation.
 
@@ -66,28 +62,28 @@ typedef struct st_timer_bucket
 
 	struct timespec		curtime;		//system time, update every tick.
 	struct timespec		resolution;		//tick, resolution for timer bucket.
-	
+
 	pthread_t			thread_id;		//work thread id.
 
 	char				name[16];		//bucket name, will name to work thread.
 	int					pipefd[2];		//pipe for accept new io event fd.
 	int					epoll_fd;		//poll fd.
 	int					timerfd;		//bucket timer fd, by timerfd_create.
-	
+
 	int					size;			//bucket max size.
 	int					count;			//current timer count in bucket.
 	int					cpuid;			//core id to bind.
 	int					trigger;		//control working thread.
-}timer_bucket_t;
+} timer_bucket_t;
 
 struct timespec g_sys_curtime;	//system real time, can be used by other module with efficiency.
 
 static int add_epoll_event(int fd, int event, int epollfd)
 {
-    struct epoll_event ev;
-    ev.data.fd = fd;
-    ev.events = event;
-    return epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &ev);
+	struct epoll_event ev;
+	ev.data.fd = fd;
+	ev.events = event;
+	return epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &ev);
 }
 
 static inline int compare_timespec(struct timespec t1, struct timespec t2)
@@ -101,13 +97,13 @@ static inline int compare_timespec(struct timespec t1, struct timespec t2)
 
 static void update_curtime(struct timespec* cur, struct timespec* tick, uint64_t nex)
 {
- 	cur->tv_sec += (nex * tick->tv_sec);
+	cur->tv_sec += (nex * tick->tv_sec);
 	cur->tv_nsec += (nex * tick->tv_nsec);
 	while (cur->tv_nsec > 1000000000) {
 		cur->tv_sec += 1;
 		cur->tv_nsec -= 1000000000;
 	}
-	
+
 	__sync_lock_test_and_set(&g_sys_curtime.tv_sec, cur->tv_sec);
 	__sync_lock_test_and_set(&g_sys_curtime.tv_nsec, cur->tv_nsec);
 }
@@ -129,9 +125,9 @@ static void check_timers_in_bucket(timer_bucket_t *p_bkt)
 
 		//already timeout, call proc func.
 		pos->func(pos->data);
-		
+
 		//once timer, remove from active list and recycle.
-		//cycle timer, remove from active list, setup time, insert into active list again. 
+		//cycle timer, remove from active list, setup time, insert into active list again.
 		if (0 == pos->type) {
 			list_del(&pos->entry);
 			list_add_tail(&pos->entry, &p_bkt->recycle_list);
@@ -151,50 +147,51 @@ static void proc_timer_opt_event(int pipefd, timer_bucket_t *p_bkt)
 	ltimer_t* p_timer = NULL;
 
 	do {
-		nread = read( pipefd, &optev, sizeof(ltimer_opt_t));
+		nread = read(pipefd, &optev, sizeof(ltimer_opt_t));
 		if (-1 == nread || 0 == nread) {
 			return;
 		}
-		
-		if ( nread != sizeof(ltimer_opt_t) ) {
+
+		if (nread != sizeof(ltimer_opt_t)) {
 			printf("%s: read %d bytes, error info: %s!\n", __func__, nread, strerror(errno));
 			break;
 		}
 
 		p_timer = (ltimer_t *)optev.id;
-		switch (optev.opt)
-		{
-			case EN_TIMER_OPT_ADD: {
-				p_timer->expire.tv_sec = p_bkt->curtime.tv_sec + p_timer->period.tv_sec;
-				p_timer->expire.tv_nsec = p_bkt->curtime.tv_nsec + p_timer->period.tv_nsec;
-				list_insert_reverse(&p_timer->entry, &p_bkt->active_list, compare_timer_by_entry, 1);
-				__sync_add_and_fetch(&p_bkt->count, 1);
-				break;
-			};
-			case EN_TIMER_OPT_DEL: {
+		switch (optev.opt) {
+		case EN_TIMER_OPT_ADD: {
+			p_timer->expire.tv_sec = p_bkt->curtime.tv_sec + p_timer->period.tv_sec;
+			p_timer->expire.tv_nsec = p_bkt->curtime.tv_nsec + p_timer->period.tv_nsec;
+			list_insert_reverse(&p_timer->entry, &p_bkt->active_list, compare_timer_by_entry, 1);
+			__sync_add_and_fetch(&p_bkt->count, 1);
+			break;
+		};
+		case EN_TIMER_OPT_DEL: {
+			list_del(&p_timer->entry);
+			list_add_tail(&p_timer->entry, &p_bkt->recycle_list);
+			__sync_sub_and_fetch(&p_bkt->count, 1);
+			break;
+		};
+		case EN_TIMER_OPT_MOD: {
+			if (NULL != optev.func) {
+				p_timer->func = optev.func;
+			}
+			if (NULL != optev.data) {
+				p_timer->data = optev.data;
+			}
+			if (optev.period.tv_sec != 0 || optev.period.tv_nsec != 0) {
 				list_del(&p_timer->entry);
-				list_add_tail(&p_timer->entry, &p_bkt->recycle_list);
-				__sync_sub_and_fetch(&p_bkt->count, 1);
-				break;
-			};
-			case EN_TIMER_OPT_MOD: {
-				if (NULL != optev.func) {
-					p_timer->func = optev.func;
-				}
-				if (NULL != optev.data) {
-					p_timer->data = optev.data;
-				}
-				if (optev.period.tv_sec != 0 || optev.period.tv_nsec != 0) {
-					list_del(&p_timer->entry);
-					p_timer->expire.tv_sec = p_bkt->curtime.tv_sec + optev.period.tv_sec;
-					p_timer->expire.tv_nsec = p_bkt->curtime.tv_nsec + optev.period.tv_nsec;
-					list_insert_reverse(&p_timer->entry, &p_bkt->active_list, compare_timer_by_entry, 1);
-				}
-				break;
-			};
-			default: { break; }
+				p_timer->expire.tv_sec = p_bkt->curtime.tv_sec + optev.period.tv_sec;
+				p_timer->expire.tv_nsec = p_bkt->curtime.tv_nsec + optev.period.tv_nsec;
+				list_insert_reverse(&p_timer->entry, &p_bkt->active_list, compare_timer_by_entry, 1);
+			}
+			break;
+		};
+		default: {
+			break;
 		}
-	}while(1);
+		}
+	} while (1);
 }
 
 static void* work_routine(void *arg)
@@ -215,14 +212,14 @@ static void* work_routine(void *arg)
 		printf("set_thread_name failed with error info: %s\n", strerror(errno));
 		return NULL;
 	}
-	
+
 	//add pipefd[0] into epoll event.
 	retval = add_epoll_event(p_info->pipefd[0], (EPOLLIN | EPOLLET), p_info->epoll_fd);
 	if (0 != retval) {
 		printf("add_epoll_event failed with error info: %s\n", strerror(errno));
 		return NULL;
 	}
-	
+
 	//get realtime from system.
 	retval = clock_gettime(CLOCK_REALTIME, &p_info->curtime);
 	if (0 != retval) {
@@ -231,7 +228,7 @@ static void* work_routine(void *arg)
 	}
 	printf("%s: p_info->curtime.tv_sec = %ld\n", __func__, p_info->curtime.tv_sec);
 	printf("%s: p_info->curtime.tv_nsec = %ld\n", __func__, p_info->curtime.tv_nsec);
-	
+
 	//add update system time event into epollfd.
 	struct itimerspec itmspec;
 	itmspec.it_value = p_info->resolution;
@@ -246,12 +243,12 @@ static void* work_routine(void *arg)
 		printf("add_epoll_event failed with error info: %s\n", strerror(errno));
 		return NULL;
 	}
-	
+
 	//epoll event loop.
 	int i, nread, nfds;
 	uint64_t nexpired = 0;
-    struct epoll_event events[MAX_EVENT_NUMBER];
-	
+	struct epoll_event events[MAX_EVENT_NUMBER];
+
 	while (1 == p_info->trigger) {
 		nfds = epoll_wait(p_info->epoll_fd, events, MAX_EVENT_NUMBER, -1);
 		if (nfds <= 0) {
@@ -260,9 +257,9 @@ static void* work_routine(void *arg)
 
 		for (i = 0; i < nfds; i++) {
 			//tick event coming, update system time, check timers in bucket.
-			if ( events[i].data.fd == p_info->timerfd && (events[i].events & EPOLLIN ) ) {
+			if (events[i].data.fd == p_info->timerfd && (events[i].events & EPOLLIN)) {
 				nread = read(p_info->timerfd, &nexpired, sizeof(uint64_t));
-				if ( sizeof(uint64_t) != nread ) {
+				if (sizeof(uint64_t) != nread) {
 					continue;
 				}
 				//printf("tick event coming [%ld]!\n", nexpired);
@@ -270,7 +267,7 @@ static void* work_routine(void *arg)
 				check_timers_in_bucket(p_info);
 			}
 			//pipe event coming, proc add/del/mod timer event.
-			else if (events[i].data.fd == p_info->pipefd[0]  && (events[i].events & EPOLLIN ) ) {
+			else if (events[i].data.fd == p_info->pipefd[0]  && (events[i].events & EPOLLIN)) {
 				//printf("pipe event coming!\n");
 				proc_timer_opt_event(p_info->pipefd[0], p_info);
 			}
@@ -282,27 +279,27 @@ static void* work_routine(void *arg)
 //---------------------------------------------------------------------------------------------------------
 TimerBucketID_t create_timer_bucket(const char *name, int size, int cpuid, struct timespec resolution)
 {
-	if ( size < 0 || cpuid < 0 
-		|| resolution.tv_sec < 0 || resolution.tv_nsec < 0 
-		|| (resolution.tv_sec == 0 && resolution.tv_nsec == 0) ) {
+	if (size < 0 || cpuid < 0
+		|| resolution.tv_sec < 0 || resolution.tv_nsec < 0
+		|| (resolution.tv_sec == 0 && resolution.tv_nsec == 0)) {
 		printf("%s: Invalid parameter!\n", __func__);
 		return -1;
 	}
 
 	int retval = 0;
 	timer_bucket_t *p_bkt = (timer_bucket_t *)calloc(sizeof(timer_bucket_t), 1);
-	if ( NULL == p_bkt ) {
+	if (NULL == p_bkt) {
 		printf("%s: calloc failed!\n", __func__);
 		return -1;
 	}
 	p_bkt->mem_alloc_ptr = (char *)calloc(sizeof(ltimer_t), size);
-	if ( NULL == p_bkt->mem_alloc_ptr ) {
+	if (NULL == p_bkt->mem_alloc_ptr) {
 		printf("%s: calloc failed!\n", __func__);
 		retval = -1;
 		goto cleanup;
 	}
 
-	if ( NULL != name ) {
+	if (NULL != name) {
 		snprintf(p_bkt->name, sizeof(p_bkt->name), "%s", name);
 	}
 
@@ -320,7 +317,7 @@ TimerBucketID_t create_timer_bucket(const char *name, int size, int cpuid, struc
 	}
 
 	p_bkt->epoll_fd = epoll_create(MAX_EVENT_NUMBER);
-	if ( p_bkt->epoll_fd < 0 ) {
+	if (p_bkt->epoll_fd < 0) {
 		printf("%s: epoll_create failed with error info: %s\n", __func__, strerror(errno));
 		retval = -1;
 		goto cleanup;
@@ -344,10 +341,10 @@ TimerBucketID_t create_timer_bucket(const char *name, int size, int cpuid, struc
 	}
 
 	//wait for working thread update curtime.
-	while(0 == p_bkt->curtime.tv_sec) {
+	while (0 == p_bkt->curtime.tv_sec) {
 		usleep(10);
 	}
-	
+
 	return (TimerBucketID_t)p_bkt;
 
 cleanup:
@@ -355,18 +352,23 @@ cleanup:
 		free(p_bkt->mem_alloc_ptr);
 		p_bkt->mem_alloc_ptr = NULL;
 	}
-	if ( 0 != p_bkt->timerfd ) {
-		close(p_bkt->timerfd); p_bkt->timerfd = 0;
+	if (0 != p_bkt->timerfd) {
+		close(p_bkt->timerfd);
+		p_bkt->timerfd = 0;
 	}
-	if ( 0 != p_bkt->pipefd[0] ) {
-		close(p_bkt->pipefd[0]); p_bkt->pipefd[0] = 0;
-		close(p_bkt->pipefd[1]); p_bkt->pipefd[1] = 0;
+	if (0 != p_bkt->pipefd[0]) {
+		close(p_bkt->pipefd[0]);
+		p_bkt->pipefd[0] = 0;
+		close(p_bkt->pipefd[1]);
+		p_bkt->pipefd[1] = 0;
 	}
-	if ( 0 != p_bkt->epoll_fd ) {
-		close(p_bkt->epoll_fd); p_bkt->epoll_fd = 0;
+	if (0 != p_bkt->epoll_fd) {
+		close(p_bkt->epoll_fd);
+		p_bkt->epoll_fd = 0;
 	}
 	if (NULL != p_bkt) {
-		free(p_bkt); p_bkt = NULL;
+		free(p_bkt);
+		p_bkt = NULL;
 	}
 	return -1;
 }
@@ -374,29 +376,34 @@ cleanup:
 void destroy_timer_bucket(TimerBucketID_t bktid)
 {
 	timer_bucket_t *p_bkt = (timer_bucket_t *)bktid;
-	
+
 	p_bkt->trigger = 0;
 	pthread_join(p_bkt->thread_id, NULL);
 	pthread_spin_destroy(&p_bkt->splock);
 	if (0 != p_bkt->timerfd) {
-		close(p_bkt->timerfd); p_bkt->timerfd = 0;
+		close(p_bkt->timerfd);
+		p_bkt->timerfd = 0;
 	}
 	if (0 != p_bkt->pipefd[0]) {
-		close(p_bkt->pipefd[0]); p_bkt->pipefd[0] = 0;
-		close(p_bkt->pipefd[1]); p_bkt->pipefd[1] = 0;
+		close(p_bkt->pipefd[0]);
+		p_bkt->pipefd[0] = 0;
+		close(p_bkt->pipefd[1]);
+		p_bkt->pipefd[1] = 0;
 	}
 	if (0 != p_bkt->epoll_fd) {
-		close(p_bkt->epoll_fd); p_bkt->epoll_fd = 0;
+		close(p_bkt->epoll_fd);
+		p_bkt->epoll_fd = 0;
 	}
 	if (NULL != p_bkt->mem_alloc_ptr) {
-		free(p_bkt->mem_alloc_ptr); p_bkt->mem_alloc_ptr = NULL;
+		free(p_bkt->mem_alloc_ptr);
+		p_bkt->mem_alloc_ptr = NULL;
 	}
 	free(p_bkt);
 }
 
 TimerID_t add_timer(TimerBucketID_t bktid, struct timespec tm, time_out_proc func, void *data, int type)
 {
-	if (bktid == 0 
+	if (bktid == 0
 		|| tm.tv_sec < 0 || tm.tv_nsec < 0 || (tm.tv_sec == 0 && tm.tv_nsec == 0)
 		|| NULL == func || NULL == data || (type != 0 && type != 1)) {
 		printf("%s: Invalid parameter!\n", __func__);
@@ -405,15 +412,15 @@ TimerID_t add_timer(TimerBucketID_t bktid, struct timespec tm, time_out_proc fun
 
 	int nret = 0;
 	ltimer_opt_t optev;
-	ltimer_t *p_timer = NULL;	
+	ltimer_t *p_timer = NULL;
 	timer_bucket_t *p_bkt = (timer_bucket_t *)bktid;
 
 	//get new timer from recycle_list or resource pool.
 	pthread_spin_lock(&p_bkt->splock);
-	if ( !list_empty(&p_bkt->recycle_list) ) {
+	if (!list_empty(&p_bkt->recycle_list)) {
 		p_timer = (ltimer_t *) list_entry(p_bkt->recycle_list.next, ltimer_t, entry);
 		list_del(p_bkt->recycle_list.next);
-	} else if ( (int)((p_bkt->cur_alloc_ptr - p_bkt->mem_alloc_ptr)/sizeof(ltimer_t)) < p_bkt->size ) {
+	} else if ((int)((p_bkt->cur_alloc_ptr - p_bkt->mem_alloc_ptr) / sizeof(ltimer_t)) < p_bkt->size) {
 		p_timer = (ltimer_t *)p_bkt->cur_alloc_ptr;
 		p_bkt->cur_alloc_ptr += sizeof(ltimer_t);
 	}
@@ -436,7 +443,7 @@ TimerID_t add_timer(TimerBucketID_t bktid, struct timespec tm, time_out_proc fun
 	memset(&optev, 0, sizeof(ltimer_opt_t));
 	optev.opt = EN_TIMER_OPT_ADD;
 	optev.id = (TimerID_t)p_timer;
-	
+
 	//writing bytes less than PIPE_BUF is atomic operation is guaranteed by system.
 	nret = write(p_bkt->pipefd[1], &optev, sizeof(ltimer_opt_t));
 	if (nret != sizeof(ltimer_opt_t)) {
@@ -456,7 +463,7 @@ cleanup:
 int mod_timer(TimerID_t timerid, struct timespec tm, time_out_proc func, void *data)
 {
 	ltimer_t *p_timer = (ltimer_t *)timerid;
-	if ( NULL == p_timer || NULL == p_timer->p_bkt ) {
+	if (NULL == p_timer || NULL == p_timer->p_bkt) {
 		printf("%s: Invalid timer id!\n", __func__);
 		return -1;
 	}
@@ -464,7 +471,7 @@ int mod_timer(TimerID_t timerid, struct timespec tm, time_out_proc func, void *d
 	int nret = 0;
 	ltimer_opt_t optev;
 	timer_bucket_t *p_bkt = (timer_bucket_t *)p_timer->p_bkt;
-	
+
 	memset(&optev, 0, sizeof(ltimer_opt_t));
 	optev.opt = EN_TIMER_OPT_MOD;
 	optev.id = timerid;
@@ -474,12 +481,12 @@ int mod_timer(TimerID_t timerid, struct timespec tm, time_out_proc func, void *d
 	if (NULL != func) {
 		optev.func = func;
 	}
-	if(NULL != data) {
+	if (NULL != data) {
 		optev.data = data;
 	}
-	
+
 	nret = write(p_bkt->pipefd[1], &optev, sizeof(ltimer_opt_t));
-	if ( nret != sizeof(ltimer_opt_t) ) {
+	if (nret != sizeof(ltimer_opt_t)) {
 		printf("%s: write pipe error!\n", __func__);
 		return -1;
 	}
@@ -497,7 +504,7 @@ int del_timer(TimerID_t timerid)
 	int nret = 0;
 	ltimer_opt_t optev;
 	timer_bucket_t *p_bkt = (timer_bucket_t *)p_timer->p_bkt;
-	
+
 	memset(&optev, 0, sizeof(ltimer_opt_t));
 	optev.opt = EN_TIMER_OPT_DEL;
 	optev.id = timerid;

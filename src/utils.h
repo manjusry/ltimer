@@ -1,4 +1,4 @@
-#ifndef UTILS_H 
+#ifndef UTILS_H
 #define UTILS_H
 #include <pthread.h>
 
@@ -20,7 +20,7 @@
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define sys_ntohl(x) ((((x) & 0xFF000000)>>24) | (((x) & 0x00FF0000)>>8) | \
-							(((x) & 0x0000FF00)<<8 ) | (((x) & 0x000000FF)<<24))
+					  (((x) & 0x0000FF00)<<8 ) | (((x) & 0x000000FF)<<24))
 #define sys_ntohs(x)  ((((x) & 0xFF00)>>8) | (((x) & 0x00FF)<<8))
 #define sys_htonl(x)  sys_ntohl(x)
 #define sys_htons(x)  sys_ntohs(x)

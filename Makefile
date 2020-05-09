@@ -1,12 +1,11 @@
-TEST_TARGET=test_timer
+all: lib_target test_target
 
-all:$(TEST_TARGET)
+lib_target:
+	cd src && make
 
-$(TEST_TARGET):timer.o utils.o test_timer.o
-	gcc -g -Wall -pthread $^ -o $@
-	
-%.o:%.c
-	gcc -g -Wall -c $< -o $@
+test_target:
+	cd test && make
 
 clean:
-	rm -f $(TEST_TARGET) *.o
+	cd src  && make clean;
+	cd test && make clean;

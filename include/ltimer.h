@@ -1,5 +1,5 @@
-#ifndef TIMER_H
-#define TIMER_H
+#ifndef LTIMER_H
+#define LTIMER_H
 
 #include <time.h>
 
@@ -30,7 +30,7 @@ extern "C" {
 
 typedef long TimerID_t;
 typedef long TimerBucketID_t;
-typedef void  (*time_out_proc)(void* data);
+typedef void (*time_out_proc)(void* data);
 
 //---------------------------------------------------------------------------------------
 //@function: create a timer bucket.
@@ -75,4 +75,4 @@ const char* curtime_str(char *timestr, int size);
 }
 #endif
 
-#endif //TIMER_H
+#endif //LTIMER_H
